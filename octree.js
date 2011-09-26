@@ -1,4 +1,4 @@
-(function (window, document, Paladin) {
+(function () {
 
   var enums = {
     frustum: {
@@ -166,19 +166,17 @@
     }
   };
 
-  function OcNode ( options ) {
+  function OctreeNode ( options ) {
     options = options || {};
     this.type = options.type;
     this.inserted = options.inserted || function () {};
     this.aabb = options.aabb;
     this.object = options.object; 
-    options.object && this.bindObject( options.object );
     this.destroy = function () {
       that.leaves = undefined;
       that.commonRoot = undefined;
-    };
-
-  };
+    }; //destroy
+  }; //OctreeNode
 
   function Octree ( options ) {
     options = options || {};
@@ -255,7 +253,7 @@
       node.commonRoot = root;
       aabbMath.engulf( node.aabb, aabb[0] );
       aabbMath.engulf( node.aabb, aabb[1] );
-    };
+    }; //$insertNode
 
     this.insertNode = function ( node ) {
       if ( maxDepth === 0 ) {
@@ -316,8 +314,11 @@
         }
 
       } //if
-    };
+    }; //insertNode
 
   } //Octree
 
-})(window, document, Paladin);
+  window.Octree = Octree;
+  window.OctreeNode = OctreeNode;
+
+})();
