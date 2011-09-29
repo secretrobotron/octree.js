@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>octree.js Benchmark</title>
+    <script type="text/javascript" src="../octree.js"></script>
+    <script type="text/javascript" src="benchmark.js"></script>
+    <style>
+      html, body {
+        width: 100%;
+        height: 100%;
+        margin: 0px;
+        padding: 0px;
+      }
+      .benchmark-result {
+        border: 1px solid #000;
+      }
+      .benchmark-title {
+      }
+      .benchmark-time {
+      }
+      #benchmarks {
+        width: 700px;
+        margin: auto;
+        border: 1px solid #000;
+      }
+      #benchmarks-headers {
+        font-weight: bold;
+      }
+    </style>
+  </head>
+  <body>
+    <table id="benchmarks">
+      <tr id="benchmarks-headers" class="benchmark-result">
+        <td class="benchmark-title">Title</td>
+        <td class="benchmark-time">Times (ms)</td>
+        <td class="benchmark-average">Average (ms)</td>
+      </tr>
+    </table>
+  </body>
+</html>

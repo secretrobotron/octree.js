@@ -69,6 +69,7 @@
       var z = aabb[0][2] < aabb[1][2] ? aabb[1][2] - aabb[0][2] : aabb[0][2] - aabb[1][2];
       return [x,y,z];
     },
+  
     containsPoint: function ( aabb, point ) {
       return    point[0] <= aabb[1][0] 
             &&  point[1] <= aabb[1][1]
@@ -166,159 +167,241 @@
     }
   };
 
-  function OctreeNode ( options ) {
+  var Node = function( options ) {
     options = options || {};
+
+    var leaves = [],
+        that = this;
+
     this.type = options.type;
     this.inserted = options.inserted || function () {};
-    this.aabb = options.aabb;
+    this.aabb = options.aabb || [ [ 0, 0, 0 ], [ 0, 0, 0 ] ];
     this.object = options.object; 
+    this.commonRoot = undefined;
+
+    var octreeAabb = [ [ 0, 0, 0 ], [ 0, 0, 0 ] ];
+
+    this.addLeaf = function( tree ) {
+      var idx = leaves.indexOf( tree );
+      if ( idx === -1 ) {
+        leaves.push( tree );
+        var treeAabb = tree.aabb;
+        aabbMath.engulf( octreeAabb, treeAabb[0] );
+        aabbMath.engulf( octreeAabb, treeAabb[1] );
+      } //if
+    }; //addLead
+
+    this.removeLeaf = function( tree ) {
+      var idx = leaves.indexOf( tree );
+      if ( idx > -1 ) {
+        leaves.splice( idx, 1 );
+      } //if
+    }; //addLeaf
+
     this.destroy = function () {
-      that.leaves = undefined;
+      leaves = [];
       that.commonRoot = undefined;
     }; //destroy
-  }; //OctreeNode
 
-  function Octree ( options ) {
-    options = options || {};
-    var dirty = false,
-        children = [],
-        depth = options.depth || 0,
-        size = options.size || 0,
-        position = options.position || [0,0,0],
-        nodes = [],
-        sphere = position.slice().concat( Math.sqrt( 3*size/2*size/2 ) ),
-        aabb = [[0,0,0],[0,0,0]],
-        root = options.root,
-        that = this;
-    
-    var halfSize = size/2;
-    aabbMath.engulf( aabb, [position[0] + halfSize, position[1] + halfSize, position[2] + halfSize] );
-    aabbMath.engulf( aabb, [position[0] - halfSize, position[1] - halfSize, position[2] - halfSize] );
+    this.adjust = function() {
+      var aabb = this.aabb,
+          taabb = this.commonRoot.aabb,
+          px0 = aabb[0][0],
+          py0 = aabb[0][1],
+          pz0 = aabb[0][2],
+          px1 = aabb[1][0],
+          py1 = aabb[1][1],
+          pz1 = aabb[1][2],
+          tx0 = taabb[0][0],
+          ty0 = taabb[0][1],
+          tz0 = taabb[0][2],
+          tx1 = taabb[1][0],
+          ty1 = taabb[1][1],
+          tz1 = taabb[1][2];
 
-    this.destroy = function () {
-      for ( var i=0, l=nodes.length; i<l; ++i ) {
-        nodes[i].destroy();
-      } //for
-      children[0] = children[1] = children[2] = children[3] = children[4] = children[5] = children[6] = children[7] = undefined;
-      root = undefined;
-      position = undefined;
-      nodes = undefined;
-      sphere = undefined;
-      aabb = undefined;
-    };
+      if (  leaves.length > 0 && 
+            ( px0 < tx0 || py0 < ty0 || 
+              pz0 < tz0 || px1 > tx1 || 
+              py1 > ty1 || pz1 > tz1)  ) {
 
-    this.removeNode = function ( node ) {
-      var idx = nodes.indexOf( node );
-      if ( idx > -1 ) {
-        node.remove();
-        nodes.splice( idx, 1 );
-        that.dirtyLineage();
-      } //if
-    };
+        for ( var i=0, l=leaves.length; i<l; ++i ) {
+            leaves[i].remove( that );
+        } //for
 
-    this.dirtyLineage = function () {
-      root && root.dirtyLineage();
-    };
+        leaves = [];
+        var oldCommonRoot = that.commonRoot;
+        that.commonRoot = undefined;
 
-    this.dirty = function ( val ) {
-      if ( val ) {
-        dirty = val;
-      }
-      return dirty;
-    };
+        if ( oldCommonRoot ) {
 
-    this.cleanUp = function () {
-      var numKeeping = 0;
-      for (var i=0, l=children.length; i<l; ++i) {
-        if ( children[i] ) {
-          var child = children[i],
-              keep = true;
-          if (child.dirty() === true) {
-            keep = child.cleanUp();
-          } //if
-          if (!keep) {
-            child = children[i] = undefined;
-          } else {
-            ++numKeeping;
-          }
+          while ( true ) {
+            var oldCommonAabb = oldCommonRoot.aabb;
+            if ( !aabbMath.containsPoint( aabb[ 0 ], oldCommonAabb ) ||
+                 !aabbMath.containsPoint( aabb[ 1 ], oldCommonAabb ) ) {
+              if ( oldCommonRoot.root !== undefined ) {
+                oldCommonRoot = oldCommonRoot.root;
+              }
+              else {
+                break;
+              } //if
+            } else {
+              break;
+            } //if
+          } //while
+          aabbMath.reset(this.octree_aabb, this.position);
+          oldCommonRoot.insert(this);
         } //if
-      } //for
-      return ! ( nodes.length === 0 && ( numKeeping === 0 || children.length === 0 ) );
-    };
-
-    function $insertNode( node, root ) {
-      node.inserted();
-      nodes.push( node );
-      node.leaves.push( that );
-      node.commonRoot = root;
-      aabbMath.engulf( node.aabb, aabb[0] );
-      aabbMath.engulf( node.aabb, aabb[1] );
-    }; //$insertNode
-
-    this.insertNode = function ( node ) {
-      if ( maxDepth === 0 ) {
-        $insertNode( node, root );
-        return;
       } //if
 
-      var p = position,
-          aabb = node.aabb,
-          min = aabb[0],
-          max = aabb[1],
-          tNW = min[0] < p[0] && min[1] < p[1] && min[2] < p[2],
-          tNE = max[0] > p[0] && min[1] < p[1] && min[2] < p[2],
-          bNW = min[0] < p[0] && max[1] > p[1] && min[2] < p[2],
-          bNE = max[0] > p[0] && max[1] > p[1] && min[2] < p[2],
-          tSW = min[0] < p[0] && min[1] < p[1] && max[2] > p[2],
-          tSE = max[0] > p[0] && min[1] < p[1] && max[2] > p[2],
-          bSW = min[0] < p[0] && max[1] > p[1] && max[2] > p[2],
-          bSE = max[0] > p[0] && max[1] > p[1] && max[2] > p[2],
-          numInserted = 0;
+    }; //adjust
 
-      if ( tNW && tNE && bNW && bNE && tSW && tSE && bSW && bSE ) {
-        $insertNode( node, that );
-      }
-      else {
-        var newSize = size/2,
-            offset = size/4,
-            x = p[0], y = p[1], z = p[2];
+  }; //Node
 
-        var news = [
-          [ tNW, enums.octree.T_NW, [ x - offset, y - offset, z - offset ] ],
-          [ tNE, enums.octree.T_NE, [ x + offset, y - offset, z - offset ] ],
-          [ bNW, enums.octree.B_NW, [ x - offset, y + offset, z - offset ] ],
-          [ bNE, enums.octree.B_NE, [ x + offset, y + offset, z - offset ] ],
-          [ tSW, enums.octree.T_SW, [ x - offset, y - offset, z + offset ] ],
-          [ tSE, enums.octree.T_SE, [ x + offset, y - offset, z + offset ] ],
-          [ bSW, enums.octree.B_SW, [ x - offset, y + offset, z + offset ] ],
-          [ bSE, enums.octree.B_SE, [ x + offset, y + offset, z + offset ] ]
-        ];
+  var Octree = window.Octree = function( options ) {
 
-        for ( var i=0; i<8; ++i ) {
-          if ( news[i][0] ) {
-            if ( !children[ news[i][1] ] ) {
-              children[ news[i][1] ] = new Octree({
-                size: newSize,
-                depth: depth -1,
-                root: that,
-                position: news[i][2]
-              });
-            }
-            children[ news[i][1] ].insert( node );
-            ++numInserted;
-          } //if
+    var Tree = function( options ) {
+      options = options || {};
+      var dirty = false,
+          children = [],
+          nodes = [],
+          depth = options.depth || 0,
+          size = options.size || 0,
+          hSize = size/2,
+          position = options.position || [ 0, 0, 0 ],
+          sphere = position.slice().concat( Math.sqrt( 3 * size / 2 * size / 2 ) ),
+          aabb = [ 
+            [ position[ 0 ] - hSize, position[ 1 ] - hSize, position[ 2 ] - hSize ], 
+            [ position[ 0 ] + hSize, position[ 1 ] + hSize, position[ 2 ] + hSize ], 
+          ],
+          root = options.root,
+          that = this;
+
+      Object.defineProperty( this, "position", {
+        get: function() { return position; }
+      });
+      Object.defineProperty( this, "aabb", {
+        get: function() { return aabb; }
+      });
+      Object.defineProperty( this, "children", {
+        get: function() { return children; }
+      });
+      Object.defineProperty( this, "size", {
+        get: function() { return size; }
+      });
+      Object.defineProperty( this, "nodes", {
+        get: function() { return nodes; }
+      });
+
+      function $insertNode( node, root ) {
+        nodes.push( node );
+        node.addLeaf( that );
+        node.commonRoot = root;
+        node.inserted( root );
+      }; //$insertNode
+
+      this.remove = function( node ) {
+        var idx = nodes.indexOf( node );
+        if ( idx > -1 ) {
+          nodes.splice( idx, 1 );
         }
+      }; //remove
 
-        if ( numInserted > 1 || !node.commonRoot ) {
-          node.commonRoot = that;
+      this.insert = function( node ) {
+        if ( depth === 0 ) {
+          $insertNode( node, that );
+          return;
+        } //if
+
+        var p = position,
+            aabb = node.aabb,
+            min = aabb[ 0 ],
+            max = aabb[ 1 ],
+            tNW = min[ 0 ] < p[ 0 ] && min[ 1 ] < p[ 1 ] && min[ 2 ] < p[ 2 ],
+            tNE = max[ 0 ] > p[ 0 ] && min[ 1 ] < p[ 1 ] && min[ 2 ] < p[ 2 ],
+            bNW = min[ 0 ] < p[ 0 ] && max[ 1 ] > p[ 1 ] && min[ 2 ] < p[ 2 ],
+            bNE = max[ 0 ] > p[ 0 ] && max[ 1 ] > p[ 1 ] && min[ 2 ] < p[ 2 ],
+            tSW = min[ 0 ] < p[ 0 ] && min[ 1 ] < p[ 1 ] && max[ 2 ] > p[ 2 ],
+            tSE = max[ 0 ] > p[ 0 ] && min[ 1 ] < p[ 1 ] && max[ 2 ] > p[ 2 ],
+            bSW = min[ 0 ] < p[ 0 ] && max[ 1 ] > p[ 1 ] && max[ 2 ] > p[ 2 ],
+            bSE = max[ 0 ] > p[ 0 ] && max[ 1 ] > p[ 1 ] && max[ 2 ] > p[ 2 ],
+            numInserted = 0;
+
+        if ( tNW && tNE && bNW && bNE && tSW && tSE && bSW && bSE ) {
+          $insertNode( node, that );
         }
+        else {
+          var newSize = size/2,
+              offset = size/4,
+              x = p[ 0 ], y = p[ 1 ], z = p[ 2 ];
 
-      } //if
-    }; //insertNode
+          var news = [
+            [ tNW, enums.octree.T_NW, [ x - offset, y - offset, z - offset ] ],
+            [ tNE, enums.octree.T_NE, [ x + offset, y - offset, z - offset ] ],
+            [ bNW, enums.octree.B_NW, [ x - offset, y + offset, z - offset ] ],
+            [ bNE, enums.octree.B_NE, [ x + offset, y + offset, z - offset ] ],
+            [ tSW, enums.octree.T_SW, [ x - offset, y - offset, z + offset ] ],
+            [ tSE, enums.octree.T_SE, [ x + offset, y - offset, z + offset ] ],
+            [ bSW, enums.octree.B_SW, [ x - offset, y + offset, z + offset ] ],
+            [ bSE, enums.octree.B_SE, [ x + offset, y + offset, z + offset ] ]
+          ];
 
-  } //Octree
+          for ( var i=0; i<8; ++i ) {
+            if ( news[ i ][ 0 ] ) {
+              if ( !children[ news[ i ][ 1 ] ] ) {
+                children[ news[ i ][ 1 ] ] = new Tree({
+                  size: newSize,
+                  depth: depth - 1,
+                  root: that,
+                  position: news[ i ][ 2 ]
+                });
+              }
+              children[ news[ i ][ 1 ] ].insert( node );
+              ++numInserted;
+            } //if
+          }
 
-  window.Octree = Octree;
-  window.OctreeNode = OctreeNode;
+          if ( numInserted > 1 || !node.commonRoot ) {
+            node.commonRoot = that;
+          }
+
+        } //if
+
+      }; //insert
+
+    }; //Tree
+
+    options = options || {};
+    var size = options.size || 0,
+        depth = options.depth || 0;
+
+    if ( size <= 0 ) {
+      throw new Error( "Octree needs a size > 0" );
+    } //if
+
+    if ( depth <= 0 ) {
+      throw new Error( "Octree needs a depth > 0" );
+    } //if
+
+    var root = new Tree({
+      size: size,
+      depth: depth,
+    });
+
+    this.insert = function( node ) {
+      root.insert( node );
+    }; //insert
+
+    Object.defineProperty( this, "root", {
+      get: function() { return root; }
+    });
+
+    Object.defineProperty( this, "size", {
+      get: function() { return size; }
+    });
+
+  }; //Octree
+
+  Octree.Node = Node;
+
 
 })();
