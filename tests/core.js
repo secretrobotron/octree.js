@@ -116,7 +116,6 @@
         [ -42.5, -42.5, -42.5 ]
       ],
       inserted: function( subtree ) {
-        console.log( subtree.position );
         inserted.push( subtree.position );
       }
     });
@@ -131,6 +130,122 @@
         inserted[ 1 ][ 1 ] === -31.25 &&
         inserted[ 1 ][ 2 ] === -31.25,
          "Node inserted correctly" );
+
+    drawTree( octree.root );
+
+  });
+
+  test( "Adjusting AABB", function(a) {
+    expect( 3 );
+
+    var testObj = {
+      foo: 'bar'
+    };
+
+    var inserted = [];
+
+    var octree = new Octree({
+      size: 1000,
+      depth: 4
+    });
+
+    var node = new Octree.Node({
+      object: testObj,
+      aabb: [
+        [ -82.5, -62.5, -62.5 ],
+        [ -42.5, -42.5, -42.5 ]
+      ],
+      inserted: function( subtree ) {
+        inserted.push( subtree.position );
+      }
+    });
+
+    octree.insert( node );
+
+    ok( inserted.length === 2 &&
+        inserted[ 0 ][ 0 ] === -93.75 && 
+        inserted[ 0 ][ 1 ] === -31.25 &&
+        inserted[ 0 ][ 2 ] === -31.25 &&
+        inserted[ 1 ][ 0 ] === -31.25 &&
+        inserted[ 1 ][ 1 ] === -31.25 &&
+        inserted[ 1 ][ 2 ] === -31.25,
+         "Node inserted correctly" );
+
+    node.adjust();
+
+    ok( inserted.length === 2 &&
+        inserted[ 0 ][ 0 ] === -93.75 && 
+        inserted[ 0 ][ 1 ] === -31.25 &&
+        inserted[ 0 ][ 2 ] === -31.25 &&
+        inserted[ 1 ][ 0 ] === -31.25 &&
+        inserted[ 1 ][ 1 ] === -31.25 &&
+        inserted[ 1 ][ 2 ] === -31.25,
+         "Node re-inserted correctly without moving" );
+
+    inserted = [];
+
+    node.aabb = [
+      [ 42.5, 42.5, 42.5 ],
+      [ 82.5, 62.5, 62.5 ]
+    ];
+    node.adjust();
+
+    ok( inserted.length === 2 &&
+        inserted[ 1 ][ 0 ] === 93.75 && 
+        inserted[ 1 ][ 1 ] === 31.25 &&
+        inserted[ 1 ][ 2 ] === 31.25 &&
+        inserted[ 0 ][ 0 ] === 31.25 &&
+        inserted[ 0 ][ 1 ] === 31.25 &&
+        inserted[ 0 ][ 2 ] === 31.25,
+         "Node re-inserted correctly after moving" );
+
+    drawTree( octree.root );
+
+  });
+
+  test( "Cleaning", function(a) {
+    expect( 2 );
+
+    var testObj = {
+      foo: 'bar'
+    };
+
+    var octree = new Octree({
+      size: 1000,
+      depth: 4
+    });
+
+    var node = new Octree.Node({
+      object: testObj,
+      aabb: [
+        [ 1, 1, 1 ],
+        [ 2, 2, 2 ]
+      ],
+      inserted: function( subtree ) {
+      }
+    });
+
+    octree.insert( node );
+    node.adjust();
+    octree.clean();
+
+    ok( octree.root.numChildren === 1 &&
+        octree.root.children[ Octree.enums.octree.B_SE ].numChildren === 1 &&
+        octree.root.children[ Octree.enums.octree.B_SE ].children[ Octree.enums.octree.T_NW ].numChildren === 1 &&
+        octree.root.children[ Octree.enums.octree.B_SE ].children[ Octree.enums.octree.T_NW ].children[ Octree.enums.octree.T_NW ].numChildren === 1,
+         "Node re-inserted correctly without moving" );
+
+    node.aabb = [
+      [ -2, -2, -2 ], [ -1, -1, -1 ]
+    ];
+    node.adjust();
+    octree.clean();
+
+    ok( octree.root.numChildren === 1 &&
+        octree.root.children[ Octree.enums.octree.T_NW ].numChildren === 1 &&
+        octree.root.children[ Octree.enums.octree.T_NW ].children[ Octree.enums.octree.B_SE ].numChildren === 1 &&
+        octree.root.children[ Octree.enums.octree.T_NW ].children[ Octree.enums.octree.B_SE ].children[ Octree.enums.octree.B_SE ].numChildren === 1,
+         "Node re-inserted correctly without moving" );
 
     drawTree( octree.root );
 

@@ -171,23 +171,48 @@
     options = options || {};
 
     var leaves = [],
-        that = this;
+        that = this,
+        aabb,
+        dirty = true,
+        position;
 
     this.type = options.type;
-    this.inserted = options.inserted || function () {};
-    this.aabb = options.aabb || [ [ 0, 0, 0 ], [ 0, 0, 0 ] ];
     this.object = options.object; 
-    this.commonRoot = undefined;
+    this.rootTree = undefined;
 
-    var octreeAabb = [ [ 0, 0, 0 ], [ 0, 0, 0 ] ];
+    this.inserted = function( root ) {
+      dirty = false;
+      if ( options.inserted ) {
+        options.inserted( root );
+      } //if
+    }; //inserted
+
+    Object.defineProperty( this, "aabb", {
+      get: function() {
+        return aabb;
+      },
+      set: function( val ) {
+        dirty = true;
+        aabb = val;
+        position = [
+          aabb[ 0 ][ 0 ] + ( aabb[ 1 ][ 0 ] - aabb[ 0 ][ 0 ] ) / 2,
+          aabb[ 0 ][ 1 ] + ( aabb[ 1 ][ 0 ] - aabb[ 0 ][ 1 ] ) / 2,
+          aabb[ 0 ][ 2 ] + ( aabb[ 1 ][ 0 ] - aabb[ 0 ][ 2 ] ) / 2
+        ];
+      }
+    });
+
+    that.aabb = options.aabb || [ [ 0, 0, 0 ], [ 0, 0, 0 ] ];
+
+    var octreeAABB = position.slice();
 
     this.addLeaf = function( tree ) {
       var idx = leaves.indexOf( tree );
       if ( idx === -1 ) {
         leaves.push( tree );
-        var treeAabb = tree.aabb;
-        aabbMath.engulf( octreeAabb, treeAabb[0] );
-        aabbMath.engulf( octreeAabb, treeAabb[1] );
+        var treeAABB = tree.aabb;
+        aabbMath.engulf( octreeAABB, treeAABB[0] );
+        aabbMath.engulf( octreeAABB, treeAABB[1] );
       } //if
     }; //addLead
 
@@ -200,56 +225,49 @@
 
     this.destroy = function () {
       leaves = [];
-      that.commonRoot = undefined;
+      that.rootTree = undefined;
     }; //destroy
 
     this.adjust = function() {
+      if ( !dirty ) return;
+
       var aabb = this.aabb,
-          taabb = this.commonRoot.aabb,
-          px0 = aabb[0][0],
-          py0 = aabb[0][1],
-          pz0 = aabb[0][2],
-          px1 = aabb[1][0],
-          py1 = aabb[1][1],
-          pz1 = aabb[1][2],
-          tx0 = taabb[0][0],
-          ty0 = taabb[0][1],
-          tz0 = taabb[0][2],
-          tx1 = taabb[1][0],
-          ty1 = taabb[1][1],
-          tz1 = taabb[1][2];
+          taabb = this.rootTree.aabb,
+          pMin = aabb[ 0 ], pMax = aabb[ 1 ],
+          tMin = taabb[ 0 ], tMax = taabb[ 1 ];
 
       if (  leaves.length > 0 && 
-            ( px0 < tx0 || py0 < ty0 || 
-              pz0 < tz0 || px1 > tx1 || 
-              py1 > ty1 || pz1 > tz1)  ) {
+            ( pMin[ 0 ] < tMin[ 0 ] || pMin[ 1 ] < tMin[ 1 ] || pMin[ 2 ] < tMin[ 2 ] ||
+              pMax[ 0 ] > tMax[ 0 ] || pMax[ 1 ] > tMax[ 1 ] || pMax[ 2 ] > tMax[ 2 ] ) ) {
 
         for ( var i=0, l=leaves.length; i<l; ++i ) {
-            leaves[i].remove( that );
+          leaves[i].remove( that );
         } //for
 
         leaves = [];
-        var oldCommonRoot = that.commonRoot;
-        that.commonRoot = undefined;
 
-        if ( oldCommonRoot ) {
+        var oldRootTree = that.rootTree;
+        that.rootTree = undefined;
+
+        if ( oldRootTree ) {
 
           while ( true ) {
-            var oldCommonAabb = oldCommonRoot.aabb;
-            if ( !aabbMath.containsPoint( aabb[ 0 ], oldCommonAabb ) ||
-                 !aabbMath.containsPoint( aabb[ 1 ], oldCommonAabb ) ) {
-              if ( oldCommonRoot.root !== undefined ) {
-                oldCommonRoot = oldCommonRoot.root;
+            var oldRootAABB = oldRootTree.aabb;
+            if ( !aabbMath.containsPoint( aabb[ 0 ], oldRootAABB ) ||
+                 !aabbMath.containsPoint( aabb[ 1 ], oldRootAABB ) ) {
+              if ( oldRootTree.root !== undefined ) {
+                oldRootTree = oldRootTree.root;
               }
               else {
                 break;
               } //if
-            } else {
+            }
+            else {
               break;
             } //if
           } //while
-          aabbMath.reset(this.octree_aabb, this.position);
-          oldCommonRoot.insert(this);
+          aabbMath.reset( octreeAABB, position );
+          oldRootTree.insert( that );
         } //if
       } //if
 
@@ -274,6 +292,16 @@
             [ position[ 0 ] + hSize, position[ 1 ] + hSize, position[ 2 ] + hSize ], 
           ],
           root = options.root,
+
+          T_NW = 0,
+          T_NE = 1,
+          T_SE = 2,
+          T_SW = 3,
+          B_NW = 4,
+          B_NE = 5,
+          B_SE = 6,
+          B_SW = 7
+
           that = this;
 
       Object.defineProperty( this, "position", {
@@ -281,6 +309,15 @@
       });
       Object.defineProperty( this, "aabb", {
         get: function() { return aabb; }
+      });
+      Object.defineProperty( this, "numChildren", {
+        get: function() {
+          var num = 0;
+          for ( var i=0; i<8; ++i ) {
+            num += children[ i ] ? 1 : 0;
+          } //for
+          return num;
+        }
       });
       Object.defineProperty( this, "children", {
         get: function() { return children; }
@@ -291,11 +328,14 @@
       Object.defineProperty( this, "nodes", {
         get: function() { return nodes; }
       });
+      Object.defineProperty( this, "root", {
+        get: function() { return root; }
+      });
 
       function $insertNode( node, root ) {
         nodes.push( node );
         node.addLeaf( that );
-        node.commonRoot = root;
+        node.rootTree = root;
         node.inserted( root );
       }; //$insertNode
 
@@ -335,14 +375,14 @@
               x = p[ 0 ], y = p[ 1 ], z = p[ 2 ];
 
           var news = [
-            [ tNW, enums.octree.T_NW, [ x - offset, y - offset, z - offset ] ],
-            [ tNE, enums.octree.T_NE, [ x + offset, y - offset, z - offset ] ],
-            [ bNW, enums.octree.B_NW, [ x - offset, y + offset, z - offset ] ],
-            [ bNE, enums.octree.B_NE, [ x + offset, y + offset, z - offset ] ],
-            [ tSW, enums.octree.T_SW, [ x - offset, y - offset, z + offset ] ],
-            [ tSE, enums.octree.T_SE, [ x + offset, y - offset, z + offset ] ],
-            [ bSW, enums.octree.B_SW, [ x - offset, y + offset, z + offset ] ],
-            [ bSE, enums.octree.B_SE, [ x + offset, y + offset, z + offset ] ]
+            [ tNW, T_NW, [ x - offset, y - offset, z - offset ] ],
+            [ tNE, T_NE, [ x + offset, y - offset, z - offset ] ],
+            [ bNW, B_NW, [ x - offset, y + offset, z - offset ] ],
+            [ bNE, B_NE, [ x + offset, y + offset, z - offset ] ],
+            [ tSW, T_SW, [ x - offset, y - offset, z + offset ] ],
+            [ tSE, T_SE, [ x + offset, y - offset, z + offset ] ],
+            [ bSW, B_SW, [ x - offset, y + offset, z + offset ] ],
+            [ bSE, B_SE, [ x + offset, y + offset, z + offset ] ]
           ];
 
           for ( var i=0; i<8; ++i ) {
@@ -360,13 +400,32 @@
             } //if
           }
 
-          if ( numInserted > 1 || !node.commonRoot ) {
-            node.commonRoot = that;
+          if ( numInserted > 1 || !node.rootTree ) {
+            node.rootTree = that;
           }
 
         } //if
 
       }; //insert
+
+      this.clean = function() {
+        var importantChildren = 0;
+        for ( var i=0; i<8; ++i ) {
+          if ( children [ i ] ) {
+            var isClean = children[ i ].clean();
+            if ( isClean ) {
+              children[ i ] = undefined;
+            }
+            else {
+              ++importantChildren;
+            }
+          }
+        } //for
+        if ( nodes.length === 0 && importantChildren === 0 ) {
+          return true;
+        } //if
+        return false;
+      }; //clean
 
     }; //Tree
 
@@ -391,6 +450,10 @@
       root.insert( node );
     }; //insert
 
+    this.clean = function() {
+      root.clean();
+    }; //clean
+
     Object.defineProperty( this, "root", {
       get: function() { return root; }
     });
@@ -402,6 +465,6 @@
   }; //Octree
 
   Octree.Node = Node;
-
+  Octree.enums = enums;
 
 })();
