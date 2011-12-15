@@ -1,9 +1,15 @@
 /*global text,expect,ok,module,notEqual,Paladin,test,window,start,stop,console,asyncTest*/
 (function () {
 
+  var canvas;
+
   function drawTree( tree ) {
-    var canvas = document.getElementById( "test-canvas" ),
-        ctx = canvas.getContext( "2d" ),
+    var canvas = document.createElement( "canvas" );
+        canvas.width = 400;
+        canvas.height = 400;
+        document.getElementById( "canvas-container" ).appendChild( canvas );
+
+    var ctx = canvas.getContext( "2d" ),
         width = canvas.width,
         height = canvas.height,
         size = tree.size;
