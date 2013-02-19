@@ -40,4 +40,5 @@ define(['node', 'tree'], function(node, tree){
   };
 
   Octree.Node = node.Node;
+  Octree.octants = tree.octants;
 });

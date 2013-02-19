@@ -47,13 +47,11 @@ define(function(){
       node.addLeaf(_this);
       node.rootTree = root;
       node.inserted(root);
-      ++_numChildren;
     };
 
     this.remove = function (node) {
       var idx = _nodes.indexOf( node );
       if ( idx > -1 ) {
-        --_numChildren;
         _nodes.splice( idx, 1 );
       }
     };
@@ -115,6 +113,7 @@ define(function(){
           node.rootTree = _this;
         }
 
+        _numChildren += numInserted;
       }
 
     };
@@ -123,7 +122,7 @@ define(function(){
       var importantChildren = 0;
 
       for (var i=0; i<8; ++i) {
-        if (_children [ i ]) {
+        if (_children[ i ]) {
           var isClean = _children[ i ].clean();
           if ( isClean ) {
             _children[ i ] = undefined;
@@ -134,6 +133,8 @@ define(function(){
         }
       }
       
+      _numChildren = importantChildren;
+
       if ( _nodes.length === 0 && importantChildren === 0 ) {
         return true;
       }
@@ -143,6 +144,16 @@ define(function(){
   }
 
   return {
-    Tree: Tree
+    Tree: Tree,
+    octants: {
+      T_NW: T_NW,
+      T_NE: T_NE,
+      T_SE: T_SE,
+      T_SW: T_SW,
+      B_NW: B_NW,
+      B_NE: B_NE,
+      B_SE: B_SE,
+      B_SW: B_SW
+    }
   };
 });

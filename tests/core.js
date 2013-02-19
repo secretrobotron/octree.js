@@ -195,6 +195,7 @@
         [ 42.5, 42.5, 42.5 ],
         [ 82.5, 62.5, 62.5 ]
       ];
+
       node.adjust();
 
       ok( inserted.length === 2 &&
@@ -222,25 +223,28 @@
         depth: 4
       });
 
+      var insertedSubTree;
+
       var node = new Octree.Node({
         object: testObj,
         aabb: [
           [ 1, 1, 1 ],
           [ 2, 2, 2 ]
         ],
-        inserted: function( subtree ) {
+        inserted: function (subtree) {
+          insertedSubTree = subtree;
         }
       });
 
-      octree.insert( node );
+      octree.insert(node);
       node.adjust();
       octree.clean();
 
       ok( octree.root.numChildren === 1 &&
-          octree.root.children[ Octree.enums.octree.B_SE ].numChildren === 1 &&
-          octree.root.children[ Octree.enums.octree.B_SE ].children[ Octree.enums.octree.T_NW ].numChildren === 1 &&
-          octree.root.children[ Octree.enums.octree.B_SE ].children[ Octree.enums.octree.T_NW ].children[ Octree.enums.octree.T_NW ].numChildren === 1,
-           "Node re-inserted correctly without moving" );
+          octree.root.children[ Octree.octants.B_SE ].numChildren === 1 &&
+          octree.root.children[ Octree.octants.B_SE ].children[ Octree.octants.T_NW ].numChildren === 1 &&
+          octree.root.children[ Octree.octants.B_SE ].children[ Octree.octants.T_NW ].children[ Octree.octants.T_NW ].numChildren === 1,
+           "Node cleaned" );
 
       node.aabb = [
         [ -2, -2, -2 ], [ -1, -1, -1 ]
@@ -249,10 +253,10 @@
       octree.clean();
 
       ok( octree.root.numChildren === 1 &&
-          octree.root.children[ Octree.enums.octree.T_NW ].numChildren === 1 &&
-          octree.root.children[ Octree.enums.octree.T_NW ].children[ Octree.enums.octree.B_SE ].numChildren === 1 &&
-          octree.root.children[ Octree.enums.octree.T_NW ].children[ Octree.enums.octree.B_SE ].children[ Octree.enums.octree.B_SE ].numChildren === 1,
-           "Node re-inserted correctly without moving" );
+          octree.root.children[ Octree.octants.T_NW ].numChildren === 1 &&
+          octree.root.children[ Octree.octants.T_NW ].children[ Octree.octants.B_SE ].numChildren === 1 &&
+          octree.root.children[ Octree.octants.T_NW ].children[ Octree.octants.B_SE ].children[ Octree.octants.B_SE ].numChildren === 1,
+           "Node cleaned" );
 
       drawTree( octree.root );
 
