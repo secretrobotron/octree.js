@@ -1,4 +1,4 @@
-define(function(){
+define('aabb', function () {
   var bases = [
     [1, 0, 0],
     [0, 1, 0],
@@ -30,10 +30,11 @@ define(function(){
         aabb[1][2] = point[2];
       }
     },
+
     reset: function (aabb, point) {
       if (point === undefined) {
         point = [0,0,0];
-      } //if
+      }
       aabb[0][0] = point[0];
       aabb[0][1] = point[1];
       aabb[0][2] = point[2];
@@ -41,6 +42,7 @@ define(function(){
       aabb[1][1] = point[1];
       aabb[1][2] = point[2];
     },
+
     size: function (aabb) {
       var x = aabb[0][0] < aabb[1][0] ? aabb[1][0] - aabb[0][0] : aabb[0][0] - aabb[1][0];
       var y = aabb[0][1] < aabb[1][1] ? aabb[1][1] - aabb[0][1] : aabb[0][1] - aabb[1][1];
@@ -56,6 +58,7 @@ define(function(){
             &&  point[1] >= aabb[0][1]
             &&  point[2] >= aabb[0][2];
     },
+
     overlaps: function (aabb1, aabb2) {
       // thanks flipcode! http://www.flipcode.com/archives/2D_OBB_Intersection.shtml
 
@@ -97,11 +100,12 @@ define(function(){
       } //for
       return true;
     },
-    intersectsAABB: function ( aabb1, aabb2 ) {
-      if ( aabbMath.containsPoint( aabb1, aabb2[0] ) || aabbMath.containsPoint( aabb1, aabb2[1] ) ) {
+
+    intersectsAABB: function (aabb1, aabb2) {
+      if (aabbMath.containsPoint(aabb1, aabb2[0]) || aabbMath.containsPoint(aabb1, aabb2[1])) {
         return true;
       }
-      return aabbMath.overlaps( aabb1, aabb2 ) || aabbMath.overlaps( aabb2, aabb1 );
+      return aabbMath.overlaps(aabb1, aabb2) || aabbMath.overlaps(aabb2, aabb1);
     }
   };
 });

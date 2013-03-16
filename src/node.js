@@ -1,116 +1,150 @@
-define(['aabb'], function(aabb){
+define('node', ['aabb'], function (aabb) {
 
-  return {
-    Node: function (options) {
-      options = options || {};
+  // Wraps an object to be stored in an Octree.
+  function Node (options) {
 
-      var _leaves = [];
-      var _aabb;
-      var _dirty = true;
-      var _position;
-      var _this = this;
-      var _rootTree;
+    // Safely initialize the options object.
+    options = options || {};
 
-      this.type = options.type;
-      this.object = options.object; 
+    // Leaf subtrees with which this node is associated.
+    this.leaves = [];
 
-      this.inserted = function (root) {
-        dirty = false;
-        if (options.inserted) {
-          options.inserted(root);
-        }
-      };
+    // Signifies whether or not an update is required.
+    this.dirty = false;
 
-      Object.defineProperties(this, {
-        rootTree: {
-          get: function () { return _rootTree },
-          set: function (val) { _rootTree = val; }
-        },
-        aabb: {
-          get: function() {
-            return _aabb;
-          },
-          set: function( val ) {
-            dirty = true;
-            _aabb = val;
-            position = [
-              _aabb[ 0 ][ 0 ] + ( _aabb[ 1 ][ 0 ] - _aabb[ 0 ][ 0 ] ) / 2,
-              _aabb[ 0 ][ 1 ] + ( _aabb[ 1 ][ 0 ] - _aabb[ 0 ][ 1 ] ) / 2,
-              _aabb[ 0 ][ 2 ] + ( _aabb[ 1 ][ 0 ] - _aabb[ 0 ][ 2 ] ) / 2
-            ];
-          }
-        }
-      });
+    // 3 vector denoting the position of this node in space.
+    this.position = [0, 0, 0];
 
-      _this.aabb = options.aabb || [ [ 0, 0, 0 ], [ 0, 0, 0 ] ];
+    // Closes root subtree with which this node is associated.
+    // For optimizations in moving the node around the tree.
+    this.rootTree = null;
 
-      var octreeAABB = position.slice();
+    // Callback for when this node has arrived at its destination leaf.
+    this._insertedCallback = options.inserted || function(){};
 
-      this.addLeaf = function (tree) {
-        var idx = _leaves.indexOf(tree);
-        if (idx === -1) {
-          _leaves.push(tree);
-          var treeAABB = tree.aabb;
-          aabb.engulf( octreeAABB, treeAABB[0] );
-          aabb.engulf( octreeAABB, treeAABB[1] );
-        }
-      };
+    this.type = options.type;
+    this.object = options.object; 
 
-      this.removeLeaf = function (tree) {
-        var idx = _leaves.indexOf(tree);
-        if (idx > -1) {
-          _leaves.splice(idx, 1);
-        }
-      };
+    // AABB used to give bounds and position to this node.
+    this.aabb = options.aabb || [[0,0,0], [0,0,0]];
 
-      this.destroy = function () {
-        _leaves = [];
-        _rootTree = undefined;
-      };
+    // Derive position from AABB immediately.
+    this.updatePosition();
+  }
 
-      this.adjust = function() {
-        if (!dirty) return;
+  Node.prototype.updatePosition = function() {
+    // Cache this.aabb for fast lookup 
+    var bb = this.aabb;
 
-        var taabb = _rootTree.aabb,
-            pMin = _aabb[ 0 ], pMax = _aabb[ 1 ],
-            tMin = taabb[ 0 ], tMax = taabb[ 1 ];
+    // x = minimum x bound plus half the size of the bb on x axis
+    this.position[0] = bb[0][0] + (bb[1][0] - bb[0][0]) / 2;
 
-        if (  _leaves.length > 0 && 
-              ( pMin[ 0 ] < tMin[ 0 ] || pMin[ 1 ] < tMin[ 1 ] || pMin[ 2 ] < tMin[ 2 ] ||
-                pMax[ 0 ] > tMax[ 0 ] || pMax[ 1 ] > tMax[ 1 ] || pMax[ 2 ] > tMax[ 2 ] ) ) {
+    // y = minimum y bound plus half the size of the bb on y axis
+    this.position[1] = bb[0][1] + (bb[1][0] - bb[0][1]) / 2;
 
-          for (var i = 0, l = _leaves.length; i < l; ++i) {
-            _leaves[i].remove(_this);
-          }
+    // z = minimum z bound plus half the size of the bb on z axis
+    this.position[2] = bb[0][2] + (bb[1][0] - bb[0][2]) / 2;
+  };
 
-          _leaves = [];
+  Node.prototype.setAABB = function (newAABB) {
+    // Store new AABB, or fall back to previously stored one. If newAABB is undefined,
+    // setAABB trivially updates the position vector.
+    this.aabb = newAABB || this.aabb;
 
-          var oldRootTree = _rootTree;
-          _rootTree = undefined;
-          if ( oldRootTree ) {
+    // Going to need updating...
+    this.dirty = true;
 
-            while ( true ) {
-              var oldRootAABB = oldRootTree.aabb;
-              if (!aabb.containsPoint( oldRootAABB, _aabb[ 0 ]) ||
-                  !aabb.containsPoint( oldRootAABB, _aabb[ 1 ])) {
-                if (oldRootTree.root !== undefined) {
-                  oldRootTree = oldRootTree.root;
-                }
-                else {
-                  break;
-                }
-              }
-              else {
-                break;
-              }
-            }
-            aabb.reset(octreeAABB, position);
-            oldRootTree.insert(_this);
-          }
-        }
+    // Make sure the position vector matches the new BB.
+    updatePosition();
+  };
 
-      };
+  Node.prototype.linkInsertion = function (rootTree, leaf) {
+    // A subtree needs to be associated with this node at the end of insertion so that `adjust`
+    // can run efficiently.
 
+    // Potential index of leaf in `leaves` reference array.
+    var leafIdx;
+
+    // Store a reference to the subtree.
+    this.rootTree = rootTree;
+
+    // If a leaf subtree was provided, store it for further `adjust` optimization.
+    if (leaf) {
+
+      // See if this node already has a reference to the leaf.
+      leafIdx = this.leaves.indexOf(leaf);
+
+      // If the leave isn't already stored...
+      if (leafIdx === -1) {
+
+        // Store a reference to the leaf.
+        this.leaves.push(leaf);
+
+        aabb.engulf(this.position, leaf.aabb[0]);
+        aabb.engulf(this.position, leaf.aabb[1]);
+      }
+    }
+
+    // Notify listeners after insertion has occurred.
+    this._insertedCallback(rootTree, leaf);
+  };
+
+  Node.prototype.removeLeaf = function (tree) {
+    var idx = this.leaves.indexOf(tree);
+    if (idx > -1) {
+      this.leaves.splice(idx, 1);
     }
   };
+
+  Node.prototype.destroy = function(){
+    this.leaves = [];
+    this.rootTree = null;
+  };
+
+  Node.prototype.adjust = function(){
+    if (!dirty) return;
+
+    var rootTree = this.rootTree;
+
+    var taabb = rootTree.aabb,
+        pMin = _aabb[ 0 ], pMax = _aabb[ 1 ],
+        tMin = taabb[ 0 ], tMax = taabb[ 1 ];
+
+    if (  _leaves.length > 0 && 
+          ( pMin[ 0 ] < tMin[ 0 ] || pMin[ 1 ] < tMin[ 1 ] || pMin[ 2 ] < tMin[ 2 ] ||
+            pMax[ 0 ] > tMax[ 0 ] || pMax[ 1 ] > tMax[ 1 ] || pMax[ 2 ] > tMax[ 2 ] ) ) {
+
+      for (var i = 0, l = _leaves.length; i < l; ++i) {
+        _leaves[i].remove(_this);
+      }
+
+      _leaves = [];
+
+      var oldRootTree = rootTree;
+      rootTree = this.rootTree = undefined;
+      if ( oldRootTree ) {
+
+        while ( true ) {
+          var oldRootAABB = oldRootTree.aabb;
+          if (!aabb.containsPoint( oldRootAABB, _aabb[ 0 ]) ||
+              !aabb.containsPoint( oldRootAABB, _aabb[ 1 ])) {
+            if (oldRootTree.root !== undefined) {
+              oldRootTree = oldRootTree.root;
+            }
+            else {
+              break;
+            }
+          }
+          else {
+            break;
+          }
+        }
+        aabb.reset(this.position, position);
+        oldRootTree.insert(_this);
+      }
+    }
+
+    this.dirty = false;
+  };
+
 });

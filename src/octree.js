@@ -1,44 +1,42 @@
-define(['node', 'tree'], function(node, tree){
-  var Octree = window.Octree = function (options) {
-
+define('octree', ['node', 'tree'], function (node, tree) {
+  function Octree (options) {
+    // Safely initialize the options object.
     options = options || {};
 
-    var _size = options.size || 0;
-    var _depth = options.depth || 0;
+    // Initialize size and depth.
+    var _size = Number(options.size);
+    var _depth = Number(options.depth);
 
-    if (_size <= 0) {
-      throw new Error("Octree needs a size > 0");
+    // We need a real size value.
+    if (isNaN(_size) || _size <= 0) {
+      throw "Octree needs a size > 0";
     }
 
-    if (_depth <= 0) {
-      throw new Error("Octree needs a depth > 0");
+    // We need a real depth value.
+    if (isNaN(_depth) || _depth <= 0) {
+      throw "Octree needs a depth > 0";
     }
 
-    var _root = new tree.Tree({
+    // Create a root subtree for this Octree with the given size and depth.
+    this.root = new tree.Tree({
       size: _size,
       depth: _depth,
     });
+  }
 
-    this.insert = function (node) {
-      _root.insert(node);
-    };
-
-    this.clean = function () {
-      _root.clean();
-    };
-
-    Object.defineProperties(this, {
-      root: {
-        enumerable: true,
-        value: _root
-      },
-      size: {
-        enumerable: true,
-        value: _size
-      }
-    });
+  Octree.prototype.insert = function (node) {
+    // Push a Node into the tree, starting at the root.
+    this.root.insert(node);
   };
 
-  Octree.Node = node.Node;
-  Octree.octants = tree.octants;
+  Octree.prototype.clean = function () {
+    // Clean subtrees starting from the root.
+    this.root.clean();
+  };
+
+  window.octree = {
+    Octree: Octree,
+    octants: octants,
+    Node: Node
+  };
 });
