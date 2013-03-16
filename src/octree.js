@@ -1,4 +1,4 @@
-define('octree', ['node', 'tree'], function (node, tree) {
+define(['node', 'tree'], function (node, tree) {
   function Octree (options) {
     // Safely initialize the options object.
     options = options || {};
@@ -36,7 +36,9 @@ define('octree', ['node', 'tree'], function (node, tree) {
 
   window.octree = {
     Octree: Octree,
-    octants: octants,
-    Node: Node
+    octants: tree.octants,
+    Node: node.Node
   };
+
+  return window.octree;
 });

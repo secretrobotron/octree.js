@@ -1,18 +1,18 @@
 (function (global, require) {
-  var initCallback;
+  var initCallbacks = [];
 
-  window.Octree = {
-    init: function (callback) {
-      initCallback = callback;
+  window.octree = {
+    ready: function (callback) {
+      initCallbacks.push(callback);
     }
   };
 
   require.config({
     context: 'octree',
     baseUrl: '/src'
-  })(['octree'], function() {
-    if(initCallback){
-      initCallback();
+  })(['octree'], function(octree) {
+    while(initCallbacks.length){
+      initCallbacks.pop()();
     }
   });
 })(window, window.require);

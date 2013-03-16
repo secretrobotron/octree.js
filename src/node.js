@@ -1,4 +1,4 @@
-define('node', ['aabb'], function (aabb) {
+define(['aabb'], function (aabb) {
 
   // Wraps an object to be stored in an Octree.
   function Node (options) {
@@ -12,8 +12,14 @@ define('node', ['aabb'], function (aabb) {
     // Signifies whether or not an update is required.
     this.dirty = false;
 
-    // 3 vector denoting the position of this node in space.
-    this.position = [0, 0, 0];
+    // 3 vector representing the position of this node in space.
+    this.position = options.position || [0, 0, 0];
+
+    // 3 vector representing the size of this node.
+    this.size = options.size || [0, 0, 0];
+
+    // AABB used to give bounds and position to this node.
+    this.bb = options.bb || [[0,0,0], [0,0,0]];
 
     // Closes root subtree with which this node is associated.
     // For optimizations in moving the node around the tree.
@@ -25,16 +31,50 @@ define('node', ['aabb'], function (aabb) {
     this.type = options.type;
     this.object = options.object; 
 
-    // AABB used to give bounds and position to this node.
-    this.aabb = options.aabb || [[0,0,0], [0,0,0]];
-
-    // Derive position from AABB immediately.
-    this.updatePosition();
+    if (options.position || options.size) {
+      if (options.bb) {
+        throw "Must supply AABB *or* position & size to construct a Node, not both.";
+      }
+      this.constructAndSetBB(this.size, this.position);  
+    }
+    else {
+      // Derive position from AABB.
+      this.updatePosition();
+    }
+    
   }
+
+  Node.prototype.constructAndSetBB = function(size, position) {
+    var bb = this.bb;
+
+    bb[0][0] = position[0] - size[0] / 2;
+    bb[1][0] = position[0] + size[0] / 2;
+
+    bb[0][1] = position[1] - size[1] / 2;
+    bb[1][1] = position[1] + size[1] / 2;
+
+    bb[0][2] = position[2] - size[2] / 2;
+    bb[1][2] = position[2] + size[2] / 2;
+
+    this.size = size;
+    this.position = position;
+
+    this.dirty = true;
+  };
+
+  Node.prototype.setSize = function(sizeVector) {
+    this.constructAndSetBB(sizeVector, this.position);
+    this.size = sizeVector;
+  };
+
+  Node.prototype.setPosition = function(positionVector) {
+    this.constructAndSetBB(this.size, positionVector);
+    this.position = positionVector;
+  };
 
   Node.prototype.updatePosition = function() {
     // Cache this.aabb for fast lookup 
-    var bb = this.aabb;
+    var bb = this.bb;
 
     // x = minimum x bound plus half the size of the bb on x axis
     this.position[0] = bb[0][0] + (bb[1][0] - bb[0][0]) / 2;
@@ -46,10 +86,10 @@ define('node', ['aabb'], function (aabb) {
     this.position[2] = bb[0][2] + (bb[1][0] - bb[0][2]) / 2;
   };
 
-  Node.prototype.setAABB = function (newAABB) {
-    // Store new AABB, or fall back to previously stored one. If newAABB is undefined,
+  Node.prototype.setBB = function (newBB) {
+    // Store new AABB, or fall back to previously stored one. If newBB is undefined,
     // setAABB trivially updates the position vector.
-    this.aabb = newAABB || this.aabb;
+    this.bb = newBB || this.bb;
 
     // Going to need updating...
     this.dirty = true;
@@ -80,10 +120,12 @@ define('node', ['aabb'], function (aabb) {
         // Store a reference to the leaf.
         this.leaves.push(leaf);
 
-        aabb.engulf(this.position, leaf.aabb[0]);
-        aabb.engulf(this.position, leaf.aabb[1]);
+        aabb.engulf(this.position, leaf.bb[0]);
+        aabb.engulf(this.position, leaf.bb[1]);
       }
     }
+
+    this.dirty = false;
 
     // Notify listeners after insertion has occurred.
     this._insertedCallback(rootTree, leaf);
@@ -96,13 +138,16 @@ define('node', ['aabb'], function (aabb) {
     }
   };
 
-  Node.prototype.destroy = function(){
-    this.leaves = [];
+  Node.prototype.destroy = function () {
+    while (this.leaves.length) {
+      this.leaves.pop();
+    }
+    this.leaves = null;
     this.rootTree = null;
   };
 
-  Node.prototype.adjust = function(){
-    if (!dirty) return;
+  Node.prototype.adjust = function () {
+    if (!this.dirty) return;
 
     var rootTree = this.rootTree;
 
@@ -122,12 +167,12 @@ define('node', ['aabb'], function (aabb) {
 
       var oldRootTree = rootTree;
       rootTree = this.rootTree = undefined;
-      if ( oldRootTree ) {
+      if (oldRootTree) {
 
-        while ( true ) {
-          var oldRootAABB = oldRootTree.aabb;
-          if (!aabb.containsPoint( oldRootAABB, _aabb[ 0 ]) ||
-              !aabb.containsPoint( oldRootAABB, _aabb[ 1 ])) {
+        while (true) {
+          var oldRootBB = oldRootTree.aabb;
+          if (!aabb.containsPoint(oldRootBB, _aabb[ 0 ]) ||
+              !aabb.containsPoint(oldRootBB, _aabb[ 1 ])) {
             if (oldRootTree.root !== undefined) {
               oldRootTree = oldRootTree.root;
             }
@@ -145,6 +190,10 @@ define('node', ['aabb'], function (aabb) {
     }
 
     this.dirty = false;
+  };
+
+  return {
+    Node: Node
   };
 
 });

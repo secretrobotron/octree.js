@@ -46,99 +46,108 @@
 
   } //drawTree
 
-  Octree.init(function(){
+  octree.ready(function () {
+    module("core");
 
-    module( "core", {
-      setup: function () {
-      },
-      teardown: function () {
-      }
+    test('Octree Creation', function () {
+      expect(1);
+      var t = new octree.Octree({size: 1, depth: 1});
+      ok(t, 'Octree exists');
     });
 
-    test( "Octree Creation", function() {
-      expect( 1 );
-      var octree = new Octree({ size: 1, depth: 1 });
-      ok( octree, "Octree exists" );
+    test('OctreeNode Creation', function () {
+      expect(1);
+      var node = new octree.Node();
+      ok(node, 'OctreeNode exists');
     });
 
-    test( "OctreeNode Creation", function() {
-      expect( 1 );
-      var node = new Octree.Node();
-      ok( node, "OctreeNode exists" );
-    });
-
-    test( "Inside boundaries", function() {
-      expect( 1 );
-
-      var testObj = {
-        foo: 'bar'
-      };
-
-      var inserted = false;
-
-      var octree = new Octree({
-        size: 1000,
-        depth: 4
-      });
-
-      var node = new Octree.Node({
-        object: testObj,
-        aabb: [
-          [ 5, 5, 5 ],
-          [ 10, 10, 10 ]
-        ],
-        inserted: function( subtree ) {
-          inserted = subtree.position;
-        }
-      });
-
-      octree.insert( node );
-
-      ok( inserted[ 0 ] === inserted[ 1 ] && 
-          inserted[ 1 ] === inserted[ 2 ] &&
-          inserted[ 2 ] === 31.25, "Node inserted correctly" );
-
-      drawTree( octree.root );
-
-    });
-
-    test( "Across boundaries", function(a) {
-      expect( 1 );
-
-      var testObj = {
-        foo: 'bar'
-      };
+    test('At intersection points', function () {
+      expect(4);
 
       var inserted = [];
+      var tree = new octree.Octree({size: 10, depth: 4});
+      var node;
 
-      var octree = new Octree({
-        size: 1000,
-        depth: 4
-      });
-
-      var node = new Octree.Node({
-        object: testObj,
-        aabb: [
-          [ -82.5, -62.5, -62.5 ],
-          [ -42.5, -42.5, -42.5 ]
-        ],
-        inserted: function( subtree ) {
-          inserted.push( subtree.position );
+      node = new octree.Node({
+        position: [0, 0, 0],
+        size: [.1, .1, .1],
+        inserted: function (subtree) {
+          inserted.push(subtree);
         }
       });
 
-      octree.insert( node );
+      tree.insert(node);
 
-      ok( inserted.length === 2 &&
-          inserted[ 0 ][ 0 ] === -93.75 && 
-          inserted[ 0 ][ 1 ] === -31.25 &&
-          inserted[ 0 ][ 2 ] === -31.25 &&
-          inserted[ 1 ][ 0 ] === -31.25 &&
-          inserted[ 1 ][ 1 ] === -31.25 &&
-          inserted[ 1 ][ 2 ] === -31.25,
-           "Node inserted correctly" );
+      equal(inserted.length, 1, 'Node attached to a single subtree.');
+      equal(inserted[0], tree.root, 'Node inserted at root.');
 
-      drawTree( octree.root );
+      inserted = [];
+
+      node = new octree.Node({
+        // tree.root.size/4 === bottom-most, south-most, east-most quadrant of root subtree
+        position: [tree.root.size/4, tree.root.size/4, tree.root.size/4],
+        size: [.1, .1, .1],
+        inserted: function (subtree) {
+          inserted.push(subtree);
+        }
+      });
+
+      tree.insert(node);
+
+      equal(inserted.length, 1, 'Node attached to a single subtree.');
+      equal(inserted[0], tree.root.children[octree.octants.B_SE], 'Node inserted at root.');
+
+      drawTree(tree.root);
+    });
+
+    test('Inside boundaries', function () {
+      expect(2);
+
+      var inserted = [];
+      var tree = new octree.Octree({size: 10, depth: 3});
+
+      var node = new octree.Node({
+        position: [1, 1, 1],
+        size: [.01, .01, .01],
+        inserted: function (subtree) {
+          inserted.push(subtree);
+        }
+      });
+
+      tree.insert(node);
+
+      equal(inserted.length, 1, 'Node attached to a single subtree.');
+      equal(tree.root.children[octree.octants.B_SE]
+              .children[octree.octants.T_NW]
+              .children[octree.octants.T_NW],
+        inserted[0], 'Node nestled in correct subtree.');
+
+      drawTree(tree.root);
+    });
+
+    test('Across boundaries', function () {
+      expect(3);
+
+      var inserted = [];
+      var tree = new octree.Octree({size: 8, depth: 2});
+
+      var node = new octree.Node({
+        position: [3, 3.5, 3.5],
+        size: [3, .1, .1],
+        inserted: function (subtree) {
+          inserted.push(subtree);
+        }
+      });
+
+      tree.insert(node);
+
+      console.log(inserted);
+
+      equal(inserted.length, 2, 'Node attatched to two subtrees.');
+      equal(inserted[0], tree.root.children[octree.octants.B_SE].children[octree.octants.B_SE], 'First subtree is correct.');
+      equal(inserted[1], tree.root.children[octree.octants.B_SE].children[octree.octants.B_SW], 'Second subtree is correct.');
+
+      drawTree( tree.root );
 
     });
 
@@ -151,23 +160,23 @@
 
       var inserted = [];
 
-      var octree = new Octree({
+      var tree = new octree.Octree({
         size: 1000,
         depth: 4
       });
 
-      var node = new Octree.Node({
+      var node = new octree.Node({
         object: testObj,
         aabb: [
           [ -82.5, -62.5, -62.5 ],
           [ -42.5, -42.5, -42.5 ]
         ],
-        inserted: function( subtree ) {
+        inserted: function (subtree) {
           inserted.push( subtree.position );
         }
       });
 
-      octree.insert( node );
+      tree.insert(node);
 
       ok( inserted.length === 2 &&
           inserted[ 0 ][ 0 ] === -93.75 && 
@@ -207,7 +216,7 @@
           inserted[ 0 ][ 2 ] === 31.25,
            "Node re-inserted correctly after moving" );
 
-      drawTree( octree.root );
+      drawTree( tree.root );
 
     });
 
@@ -218,14 +227,14 @@
         foo: 'bar'
       };
 
-      var octree = new Octree({
+      var tree = new octree.Octree({
         size: 1000,
         depth: 4
       });
 
       var insertedSubTree;
 
-      var node = new Octree.Node({
+      var node = new octree.Node({
         object: testObj,
         aabb: [
           [ 1, 1, 1 ],
@@ -236,29 +245,29 @@
         }
       });
 
-      octree.insert(node);
+      tree.insert(node);
       node.adjust();
-      octree.clean();
+      tree.clean();
 
-      ok( octree.root.numChildren === 1 &&
-          octree.root.children[ Octree.octants.B_SE ].numChildren === 1 &&
-          octree.root.children[ Octree.octants.B_SE ].children[ Octree.octants.T_NW ].numChildren === 1 &&
-          octree.root.children[ Octree.octants.B_SE ].children[ Octree.octants.T_NW ].children[ Octree.octants.T_NW ].numChildren === 1,
+      ok( tree.root.numChildren === 1 &&
+          tree.root.children[ Octree.octants.B_SE ].numChildren === 1 &&
+          tree.root.children[ Octree.octants.B_SE ].children[ Octree.octants.T_NW ].numChildren === 1 &&
+          tree.root.children[ Octree.octants.B_SE ].children[ Octree.octants.T_NW ].children[ Octree.octants.T_NW ].numChildren === 1,
            "Node cleaned" );
 
       node.aabb = [
         [ -2, -2, -2 ], [ -1, -1, -1 ]
       ];
       node.adjust();
-      octree.clean();
+      tree.clean();
 
-      ok( octree.root.numChildren === 1 &&
-          octree.root.children[ Octree.octants.T_NW ].numChildren === 1 &&
-          octree.root.children[ Octree.octants.T_NW ].children[ Octree.octants.B_SE ].numChildren === 1 &&
-          octree.root.children[ Octree.octants.T_NW ].children[ Octree.octants.B_SE ].children[ Octree.octants.B_SE ].numChildren === 1,
+      ok( tree.root.numChildren === 1 &&
+          tree.root.children[ Octree.octants.T_NW ].numChildren === 1 &&
+          tree.root.children[ Octree.octants.T_NW ].children[ Octree.octants.B_SE ].numChildren === 1 &&
+          tree.root.children[ Octree.octants.T_NW ].children[ Octree.octants.B_SE ].children[ Octree.octants.B_SE ].numChildren === 1,
            "Node cleaned" );
 
-      drawTree( octree.root );
+      drawTree(tree.root);
 
     });
 
